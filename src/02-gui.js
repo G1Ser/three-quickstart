@@ -1,13 +1,43 @@
 import "./style.css";
 import * as THREE from "three";
+import * as dat from "dat.gui";
+import gsap from "gsap";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+//gui
+const gui = new dat.GUI();
 //scene
 const scene = new THREE.Scene();
+const parameters = {
+  color: 0xff0000,
+  spin: () => {
+    gsap.to(cube.rotation, { duration: 1, y: cube.rotation.y + Math.PI * 2 });
+  },
+};
 //red cube
 const geometry = new THREE.BoxGeometry(1, 1, 1);
-const matrerial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+const matrerial = new THREE.MeshBasicMaterial({
+  color: parameters.color,
+  transparent: true,
+  opacity: 0.8,
+});
 const mesh = new THREE.Mesh(geometry, matrerial);
-scene.add(mesh);
+const edges = new THREE.EdgesGeometry(geometry);
+const edgesMaterial = new THREE.LineBasicMaterial({
+  color: 0x00ffff,
+  transparent: true,
+  opacity: 0.1,
+});
+const line = new THREE.LineSegments(edges, edgesMaterial);
+const cube = new THREE.Group();
+cube.add(mesh);
+cube.add(line);
+scene.add(cube);
+//debug
+gui.add(cube.position, "y", -1, 1, 0.01).name("Yaxis");
+gui.addColor(parameters, "color").onChange(() => {
+  matrerial.color.set(parameters.color);
+});
+gui.add(parameters, "spin");
 //camera
 const camera = new THREE.PerspectiveCamera(
   75,
