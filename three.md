@@ -20,7 +20,7 @@ A simple but complete example: [example](https://jsfiddle.net/ikatyang/182ztwao/
 
 ### 3. [arroway-textures](https://www.arroway-textures.ch/)
 
-### 4. [Poly Heaveb](https://polyhaven.com/) [HDRI to CubeMap](https://matheowis.github.io/HDRI-to-CubeMap/)
+### 4. [Poly Heaven](https://polyhaven.com/) [HDRI to CubeMap](https://matheowis.github.io/HDRI-to-CubeMap/)
 
 # GLB 模型素材
 
