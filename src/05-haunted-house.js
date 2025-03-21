@@ -5,9 +5,17 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 const scene = new THREE.Scene();
 
 // light
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+const ambientLight = new THREE.AmbientLight(0xb9d5ff, 0.1);
+const moonLight = new THREE.DirectionalLight(0xb9d5ff, 0.3);
+const doorLight = new THREE.PointLight(0xff7d46, 1, 10, 2);
+moonLight.position.set(10, 5, -5);
+doorLight.position.set(0, 2.5, 2.3);
 // add light to scene
-scene.add(ambientLight);
+scene.add(moonLight, ambientLight, doorLight);
+
+// fog
+const fog = new THREE.Fog(0x262837, 1, 15);
+scene.fog = fog;
 
 // camera
 const camera = new THREE.PerspectiveCamera(
@@ -17,7 +25,7 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 // set camera position
-camera.position.set(4, 2, 5);
+camera.position.set(4, 2, 8);
 // add camera to scene
 scene.add(camera);
 
@@ -29,6 +37,7 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.render(scene, camera);
+renderer.setClearColor(0x262837);
 
 // controls
 const controls = new OrbitControls(camera, canvas);
@@ -57,7 +66,15 @@ const wallBasicColorTexture = textureLoader.load(
 const doorBasicColorTexture = textureLoader.load(
   "/src/assets/texture/door/baseColor.jpg"
 );
-const doorAlphaTexture = textureLoader.load("/src/assets/texture/door/alpha.jpg");
+const bushBasicColorTexture = textureLoader.load(
+  "/src/assets/texture/bush/baseColor.jpg"
+);
+const graveBasicColorTexture = textureLoader.load(
+  "/src/assets/texture/grave/baseColor.jpg"
+);
+const doorAlphaTexture = textureLoader.load(
+  "/src/assets/texture/door/alpha.jpg"
+);
 const grassAmbientOcclusionTexture = textureLoader.load(
   "/src/assets/texture/grass/ambientOcclusion.jpg"
 );
@@ -147,13 +164,13 @@ wall.geometry.setAttribute(
 wall.position.y = 0.5 * 2.5;
 
 // roof
-const roofGeometry = new THREE.ConeGeometry(3.5, 1, 4);
+const roofGeometry = new THREE.ConeGeometry(3.5, 2, 4);
 const roofMaterial = new THREE.MeshStandardMaterial({
-  map: wallBasicColorTexture
+  map: wallBasicColorTexture,
 });
 const roof = new THREE.Mesh(roofGeometry, roofMaterial);
 
-roof.position.y = 2.5 + 0.5 * 1;
+roof.position.y = 2.5 + 0.5 * 2;
 roof.rotation.y = Math.PI * 0.25;
 
 // door
@@ -183,9 +200,9 @@ house.add(wall, roof, door);
 
 // bush
 const bush = new THREE.Group();
-const bushGeometry = new THREE.SphereGeometry(1, 16, 16);
+const bushGeometry = new THREE.SphereGeometry(1, 32, 32);
 const bushMaterial = new THREE.MeshStandardMaterial({
-  color: 0x89c854,
+  map: bushBasicColorTexture,
 });
 // 创建四个灌木丛
 const bush1 = new THREE.Mesh(bushGeometry, bushMaterial);
@@ -206,6 +223,24 @@ bush4.position.set(-1.6, 0.05, 2.2);
 
 bush.add(bush1, bush2, bush3, bush4);
 
+// graves
+const graves = new THREE.Group();
+const graveGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.2);
+const graveMaterial = new THREE.MeshStandardMaterial({
+  map: graveBasicColorTexture,
+});
+for (let i = 0; i < 40; i++) {
+  const angle = Math.random() * Math.PI * 2;
+  const radius = 4 + Math.random() * 5;
+  const x = Math.sin(angle) * radius;
+  const z = Math.cos(angle) * radius;
+  const grave = new THREE.Mesh(graveGeometry, graveMaterial);
+  grave.position.set(x, 0.3, z);
+  grave.rotation.y = (Math.random() - 0.5) * 0.4;
+  grave.rotation.z = (Math.random() - 0.5) * 0.4;
+  graves.add(grave);
+}
+
 // add object to scene
-scene.add(house, grass, bush);
+scene.add(grass, house, bush, graves);
 tick();
