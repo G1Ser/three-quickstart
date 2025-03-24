@@ -186,8 +186,6 @@ class ObjectFactory {
     door.position.y = 0.5 * 2 - 0.1;
     door.position.z = 2;
     
-    // 门不需要投射阴影
-    door.castShadow = false;
     // 门接收阴影
     door.receiveShadow = true;
 
@@ -218,7 +216,6 @@ class ObjectFactory {
       
       // 灌木丛投射和接收阴影
       bush.castShadow = true;
-      bush.receiveShadow = true;
       
       bushes.add(bush);
     });
@@ -247,7 +244,6 @@ class ObjectFactory {
       
       // 墓碑投射阴影
       grave.castShadow = true;
-      grave.receiveShadow = true;
 
       graves.add(grave);
     }
