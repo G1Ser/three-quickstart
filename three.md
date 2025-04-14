@@ -44,6 +44,7 @@ A simple but complete example: [example](https://jsfiddle.net/ikatyang/182ztwao/
 
 ### 10.[GrabCAD](https://grabcad.com/library)
 
+### 11.[GLTF](https://github.com/KhronosGroup/glTF-Sample-Models)
 # Material 材质
 
 ### 1.LineBasicMaterial 用于绘制几何体框线
