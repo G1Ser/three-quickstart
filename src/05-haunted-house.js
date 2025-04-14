@@ -1,4 +1,4 @@
-import "./style.css";
+import "./assets/style/style.css";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
@@ -39,16 +39,16 @@ class SceneConfigurator {
 
     moonLight.position.set(10, 5, -5);
     doorLight.position.set(0, 2.5, 2.3);
-    
+
     // 启用光源产生阴影
     moonLight.castShadow = true;
     doorLight.castShadow = true;
-    
+
     // 优化月光的阴影
     moonLight.shadow.mapSize.width = 512;
     moonLight.shadow.mapSize.height = 512;
     moonLight.shadow.camera.far = 15;
-    
+
     // 优化门灯的阴影
     doorLight.shadow.mapSize.width = 256;
     doorLight.shadow.mapSize.height = 256;
@@ -72,11 +72,11 @@ class SceneConfigurator {
 
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x262837);
-    
+
     // 启用阴影
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    
+
     return renderer;
   }
 
@@ -132,10 +132,10 @@ class ObjectFactory {
 
     const grass = this.createMeshWithUV2(geometry, material);
     grass.rotation.x = -Math.PI / 2;
-    
+
     // 草地接收阴影
     grass.receiveShadow = true;
-    
+
     return grass;
   }
 
@@ -153,7 +153,7 @@ class ObjectFactory {
 
     const wall = this.createMeshWithUV2(wallGeometry, wallMaterial);
     wall.position.y = 0.5 * 2.5;
-    
+
     // 房屋部分投射和接收阴影
     wall.castShadow = true;
     wall.receiveShadow = true;
@@ -185,7 +185,7 @@ class ObjectFactory {
     const door = this.createMeshWithUV2(doorGeometry, doorMaterial);
     door.position.y = 0.5 * 2 - 0.1;
     door.position.z = 2;
-    
+
     // 门接收阴影
     door.receiveShadow = true;
 
@@ -213,10 +213,10 @@ class ObjectFactory {
       const bush = new THREE.Mesh(geometry, material);
       bush.scale.set(config.scale, config.scale, config.scale);
       bush.position.set(...config.position);
-      
+
       // 灌木丛投射和接收阴影
       bush.castShadow = true;
-      
+
       bushes.add(bush);
     });
 
@@ -241,7 +241,7 @@ class ObjectFactory {
       grave.position.set(x, 0.3, z);
       grave.rotation.y = (Math.random() - 0.5) * 0.4;
       grave.rotation.z = (Math.random() - 0.5) * 0.4;
-      
+
       // 墓碑投射阴影
       grave.castShadow = true;
 
@@ -255,12 +255,12 @@ class ObjectFactory {
   createGhost() {
     const ghost = new THREE.PointLight(0x00ffaa, 2, 3);
     ghost.castShadow = true;
-    
+
     // 优化幽灵的阴影
     ghost.shadow.mapSize.width = 256;
     ghost.shadow.mapSize.height = 256;
     ghost.shadow.camera.far = 7;
-    
+
     return ghost;
   }
 }

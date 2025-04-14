@@ -1,4 +1,4 @@
-import "./style.css";
+import "./assets/style/style.css";
 import * as THREE from "three";
 import * as dat from "dat.gui";
 import ParticleImg from "./assets/particle/star.png";
