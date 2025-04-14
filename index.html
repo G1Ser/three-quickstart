@@ -2,14 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" href="/threejs.png" />
+    <link rel="stylesheet" href="./src/assets/style/profile.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Three QuickStart</title>
   </head>
   <body>
     <div id="app">
+      <section class="nav-dots">
+        <div class="dot active" data-page="1"></div>
+        <div class="dot" data-page="2"></div>
+        <div class="dot" data-page="3"></div>
+      </section>
+      <section class="page" id="page-1">
+        <div class="content">
+          <h1>Hello Three.js</h1>
+          <p>Experience the magic of Three.js</p>
+        </div>
+      </section>
+      <section class="page" id="page-2">
+        <div class="content">
+          <h1>3D World Creation</h1>
+          <p>Build stunning 3D scenes with just JavaScript</p>
+        </div>
+      </section>
+      <section class="page" id="page-3">
+        <div class="content">
+          <h1>Endless Possibilities</h1>
+          <p>From simple shapes to complex scenes - all in your browser</p>
+        </div>
+      </section>
       <canvas class="webgl"></canvas>
     </div>
-    <script type="module" src="./src/06-galaxy.js"></script>
+    <script type="module" src="./src/07-profile.js"></script>
   </body>
 </html>
