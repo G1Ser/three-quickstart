@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:profile": "vite --open index-profile.html",
     "build": "vite build",
     "preview": "vite preview"
   },
