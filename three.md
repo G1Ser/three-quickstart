@@ -45,6 +45,7 @@ A simple but complete example: [example](https://jsfiddle.net/ikatyang/182ztwao/
 ### 10.[GrabCAD](https://grabcad.com/library)
 
 ### 11.[GLTF](https://github.com/KhronosGroup/glTF-Sample-Models)
+
 # Material 材质
 
 ### 1.LineBasicMaterial 用于绘制几何体框线
@@ -98,3 +99,20 @@ const material = new THREE.MeshBasicMaterial({
 ### SpriteMaterial 2.5D 场景
 
 ### ShadowMaterial 模拟真实光影
+
+# 物理引擎
+
+### 3D physics libraries
+
+- [Ammo.js](https://github.com/kripken/ammo.js)&[Help](http://www.dwenzhao.cn/profession/netbuild/ammoegine.html)
+- [Cannon.js](https://github.com/schteppe/cannon.js)&[Help](http://schteppe.github.io/cannon.js/docs/)
+- [Cannon-es](https://github.com/pmndrs/cannon-es?tab=readme-ov-file)&[Help](https://pmndrs.github.io/cannon-es/docs/)
+- [Oimo.js](https://github.com/lo-th/Oimo.js/)
+- [Physijs](https://github.com/chandlerprall/Physijs)
+
+### 2D physics libraries
+
+- [Matter.js](https://github.com/liabru/matter-js)&[Help](https://brm.io/matter-js/docs/)
+- [P2.js](https://github.com/schteppe/p2.js)&[Help](http://schteppe.github.io/p2.js/docs/)
+- [Planck.js](https://github.com/piqnt/planck.js)&[Help](https://piqnt.com/planck.js/docs/)
+- [Box2D.js](https://github.com/kripken/box2d.js/)&[Help](https://box2d.org/documentation/index.html)
