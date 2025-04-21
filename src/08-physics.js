@@ -17,7 +17,6 @@ import SouthWestIcon from "./assets/svg/southwest.svg";
 import WestIcon from "./assets/svg/west.svg";
 import NorthWestIcon from "./assets/svg/northwest.svg";
 
-// 风力和方向设置（仅用于UI显示）
 let currentDirection = "North";
 let currentWindForce = 2;
 
@@ -42,13 +41,40 @@ let orbitControls;
 let sphereMesh;
 let planeMesh;
 
+// 场景属性
+const sphereRadius = 0.3;
+const sphereHeight = 5;
+const planeWidth = 10;
+const planeHeight = 10;
+const planeQuaternion = -Math.PI / 2;
+const wallsConfig = [
+  // 左墙
+  {
+    position: [-planeWidth / 2, planeHeight / 10, 0],
+    rotation: [0, planeQuaternion * 3, 0],
+  },
+  // 右墙
+  {
+    position: [planeWidth / 2, planeHeight / 10, 0],
+    rotation: [0, planeQuaternion, 0],
+  },
+  // 前墙
+  {
+    position: [0, planeHeight / 10, planeWidth / 2],
+    rotation: [planeQuaternion * 2, 0, 0],
+  },
+  // 后墙
+  {
+    position: [0, planeHeight / 10, -planeWidth / 2],
+    rotation: [0, 0, 0],
+  },
+];
 // 音频设置
 const dropSound = new Audio(DropEffect);
 const rollSound = new Audio(RollEffect);
 rollSound.loop = true;
 rollSound.volume = 0;
 let maxImpactVelocity;
-let isRollSoundPlaying = false;
 
 // 初始化标志
 let isInitialized = false;
@@ -64,11 +90,11 @@ const startGame = () => {
       startButton.parentNode.removeChild(startButton);
     }
   }, 500);
-  
+
   // 创建风力UI元素
   createWindWheel();
   createWindForceIndicator();
-  
+
   // 初始化物理场景
   if (!isInitialized) {
     initPhysics();
@@ -252,17 +278,15 @@ const initPhysics = () => {
 // 创建物理对象
 const createPhysicsObjects = () => {
   // 创建球体
-  const radius = 0.3;
-  const height = 5;
-  const sphereShape = new CANNON.Sphere(radius);
+  const sphereShape = new CANNON.Sphere(sphereRadius);
   sphereBody = new CANNON.Body({
     mass: 1,
     shape: sphereShape,
-    position: new CANNON.Vec3(0, height, 0),
+    position: new CANNON.Vec3(0, sphereHeight, 0),
     linearDamping: 0.5,
-    material: spherePhysicsMaterial
+    material: spherePhysicsMaterial,
   });
-  
+
   // 添加碰撞事件监听器
   sphereBody.addEventListener("collide", (collision) => {
     const collidedBody = collision.body;
@@ -277,44 +301,19 @@ const createPhysicsObjects = () => {
   planeBody = new CANNON.Body({
     mass: 0,
     shape: planeShape,
-    material: planePhysicsMaterial
+    material: planePhysicsMaterial,
   });
-  const quaternion = -Math.PI / 2;
-  planeBody.quaternion.setFromEuler(quaternion, 0, 0);
+  planeBody.quaternion.setFromEuler(planeQuaternion, 0, 0);
   world.addBody(planeBody);
 
   // 添加空气墙
-  const planeWidth = 10;
-  const planeHeight = 10;
-  const wallsConfig = [
-    // 左墙
-    {
-      position: new CANNON.Vec3(-planeWidth / 2, planeHeight / 2, 0),
-      rotation: [0, quaternion * 3, 0],
-    },
-    // 右墙
-    {
-      position: new CANNON.Vec3(planeWidth / 2, planeHeight / 2, 0),
-      rotation: [0, quaternion, 0],
-    },
-    // 前墙
-    {
-      position: new CANNON.Vec3(0, planeHeight / 2, planeWidth / 2),
-      rotation: [quaternion * 2, 0, 0],
-    },
-    // 后墙
-    {
-      position: new CANNON.Vec3(0, planeHeight / 2, -planeWidth / 2),
-      rotation: [0, 0, 0],
-    },
-  ];
 
   // 创建并添加所有墙
   wallsConfig.forEach((config) => {
     const wallBody = new CANNON.Body({
       mass: 0,
       shape: planeShape,
-      position: config.position,
+      position: new CANNON.Vec3(...config.position),
       material: jellyPhysicsMaterial,
     });
     wallBody.quaternion.setFromEuler(...config.rotation);
@@ -330,7 +329,7 @@ const setupContactMaterials = () => {
     planePhysicsMaterial,
     {
       restitution: 0.6, // 弹性系数
-      friction: 0.4,    // 摩擦系数
+      friction: 0.4, // 摩擦系数
     }
   );
   world.addContactMaterial(contactMaterial);
@@ -341,7 +340,7 @@ const setupContactMaterials = () => {
     jellyPhysicsMaterial,
     {
       restitution: 0.8, // 高弹性系数
-      friction: 0.1,    // 低摩擦系数
+      friction: 0.1, // 低摩擦系数
     }
   );
   world.addContactMaterial(jellyContactMaterial);
@@ -351,23 +350,23 @@ const setupContactMaterials = () => {
 const initScene = () => {
   // 创建场景
   scene = new THREE.Scene();
-  
+
   // 添加蓝天背景
-  const skyColor = 0x87CEEB; // 浅蓝色
+  const skyColor = 0xd1edfe; // 浅蓝色
   scene.background = new THREE.Color(skyColor);
 
   // 设置光照
   setupLights();
-  
+
   // 设置相机
   setupCamera();
-  
+
   // 创建可视化物体
   createVisualObjects();
-  
+
   // 设置渲染器
   setupRenderer();
-  
+
   // 添加窗口调整事件
   setupEventListeners();
 };
@@ -395,7 +394,7 @@ const setupCamera = () => {
     0.1,
     100
   );
-  camera.position.set(0, 8, 5);
+  camera.position.set(0, 8, 6);
   camera.lookAt(0, 0, 0);
   scene.add(camera);
 
@@ -406,8 +405,7 @@ const setupCamera = () => {
 // 创建可视化物体
 const createVisualObjects = () => {
   // 球体
-  const radius = 0.3;
-  const sphereGeometry = new THREE.SphereGeometry(radius, 32, 32);
+  const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 32, 32);
   const sphereMaterial = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     metalness: 0.1,
@@ -424,23 +422,34 @@ const createVisualObjects = () => {
   scene.add(sphereMesh);
 
   // 平面
-  const planeWidth = 10;
-  const planeHeight = 10;
   const planeGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-  
+
   // 加载草地纹理
   const textureLoader = new THREE.TextureLoader();
   const grassTexture = textureLoader.load(GrassColorTexture);
   grassTexture.wrapS = THREE.RepeatWrapping;
   grassTexture.wrapT = THREE.RepeatWrapping;
   grassTexture.repeat.set(5, 5);
-  
+
   const planeMaterial = new THREE.MeshStandardMaterial({
     map: grassTexture,
   });
-  
+  const wallGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight / 5);
+  // 空气墙材质
+  const wallMaterial = new THREE.MeshStandardMaterial({
+    color: 0x88ccff,
+    transparent: true,
+    opacity: 0.2,
+    side: THREE.DoubleSide,
+  });
+  wallsConfig.forEach((config) => {
+    const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+    wallMesh.position.set(...config.position);
+    wallMesh.rotation.set(...config.rotation);
+    scene.add(wallMesh);
+  });
   planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
-  planeMesh.rotation.set(-Math.PI / 2, 0, 0);
+  planeMesh.rotation.set(planeQuaternion, 0, 0);
   planeMesh.receiveShadow = true;
   scene.add(planeMesh);
 };
@@ -476,20 +485,20 @@ const animate = () => {
   const elapsedTime = clock.getElapsedTime();
   const deltaTime = elapsedTime - oldElapsedTime;
   oldElapsedTime = elapsedTime;
-  
+
   // 更新物理世界
-  world.step(1/60, deltaTime, 3);
-  
+  world.step(1 / 60, deltaTime, 3);
+
   // 更新视觉模型位置
   sphereMesh.position.copy(sphereBody.position);
   sphereMesh.quaternion.copy(sphereBody.quaternion);
-  
+
   // 更新控制器
   orbitControls.update();
-  
+
   // 渲染场景
   renderer.render(scene, camera);
-  
+
   // 请求下一帧
   window.requestAnimationFrame(animate);
 };
