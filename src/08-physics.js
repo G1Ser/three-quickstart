@@ -5,7 +5,6 @@ import "./assets/style/physics.css";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import GrassColorTexture from "./assets/texture/grasslight-big.jpg";
 import DropEffect from "./assets/audio/drop.mp3";
-import RollEffect from "./assets/audio/roll.mp3";
 import WindIcon from "./assets/svg/wind.svg";
 import WindAnimatedIcon from "./assets/svg/wind-animated.svg";
 import NorthIcon from "./assets/svg/north.svg";
@@ -16,9 +15,25 @@ import SouthIcon from "./assets/svg/south.svg";
 import SouthWestIcon from "./assets/svg/southwest.svg";
 import WestIcon from "./assets/svg/west.svg";
 import NorthWestIcon from "./assets/svg/northwest.svg";
+import * as dat from "dat.gui";
+const gui = new dat.GUI();
+gui.domElement.style.position = "absolute";
+gui.domElement.style.left = "0";
+
+const parameters = {
+  applyWind: false,
+};
+gui.add(parameters, "applyWind");
+
+// 风力值定义（0, 3, 6, 9）
+const WIND_FORCES = [0, 3, 6, 9];
+// 主要风向定义
+const MAIN_DIRECTIONS = ["North", "East", "South", "West"];
 
 let currentDirection = "North";
 let currentWindForce = 2;
+let windChangeInterval = null;
+let lastWindChangeTime = 0;
 
 // DOM元素
 const canvas = document.querySelector(".webgl");
@@ -71,13 +86,12 @@ const wallsConfig = [
 ];
 // 音频设置
 const dropSound = new Audio(DropEffect);
-const rollSound = new Audio(RollEffect);
-rollSound.loop = true;
-rollSound.volume = 0;
 let maxImpactVelocity;
 
 // 初始化标志
 let isInitialized = false;
+// 球落地标志
+let isBallLanded = false;
 
 // 游戏启动函数
 const startGame = () => {
@@ -90,10 +104,6 @@ const startGame = () => {
       startButton.parentNode.removeChild(startButton);
     }
   }, 500);
-
-  // 创建风力UI元素
-  createWindWheel();
-  createWindForceIndicator();
 
   // 初始化物理场景
   if (!isInitialized) {
@@ -130,16 +140,17 @@ const createWindForceIndicator = () => {
   forceLevelsContainer.className = "force-levels-container";
 
   // 创建四个风力级别
-  [0, 1, 2, 3].forEach((force) => {
+  [0, 1, 2, 3].forEach((index) => {
     const forceLevel = document.createElement("div");
+    const forceValue = WIND_FORCES[index]; // 获取实际风力值
     forceLevel.className = `force-level ${
-      currentWindForce === force ? "active" : "inactive"
+      currentWindForce === forceValue ? "active" : "inactive"
     }`;
-    forceLevel.setAttribute("data-force", force);
+    forceLevel.setAttribute("data-force", index);
 
     // 添加风图标 (使用img标签加载SVG)
     const windImg = document.createElement("img");
-    if (currentWindForce === force && force > 0) {
+    if (currentWindForce === forceValue && forceValue > 0) {
       windImg.src = WindAnimatedIcon;
     } else {
       windImg.src = WindIcon;
@@ -149,7 +160,7 @@ const createWindForceIndicator = () => {
     // 添加级别数字
     const forceNumber = document.createElement("div");
     forceNumber.className = "force-number";
-    forceNumber.textContent = force;
+    forceNumber.textContent = forceValue; // 显示实际风力值
     forceLevel.appendChild(forceNumber);
     forceLevelsContainer.appendChild(forceLevel);
   });
@@ -242,14 +253,13 @@ const createWindWheel = () => {
 };
 
 // 播放碰撞音效
-const playDropSound = (collision) => {
-  const impactVelocity = collision.contact.getImpactVelocityAlongNormal();
+const playDropSound = (velocity) => {
   if (!maxImpactVelocity) {
-    maxImpactVelocity = impactVelocity;
+    maxImpactVelocity = velocity;
   }
 
-  if (Math.abs(impactVelocity) > 1.5) {
-    dropSound.volume = impactVelocity / maxImpactVelocity;
+  if (velocity > 1.5) {
+    dropSound.volume = velocity / maxImpactVelocity;
     dropSound.currentTime = 0.9;
     dropSound.play();
   }
@@ -290,8 +300,21 @@ const createPhysicsObjects = () => {
   // 添加碰撞事件监听器
   sphereBody.addEventListener("collide", (collision) => {
     const collidedBody = collision.body;
+    const velocity = collision.contact.getImpactVelocityAlongNormal();
     if (collidedBody.material === planePhysicsMaterial) {
-      playDropSound(collision);
+      playDropSound(velocity);
+    }
+    if (velocity < 0.1) {
+      // 创建风力UI元素
+      createWindWheel();
+      createWindForceIndicator();
+      isBallLanded = true;
+
+      // 设置初始风力和方向
+      updateWindForceAndDirection();
+
+      // 启动3-5秒后变化风力的计时
+      lastWindChangeTime = Date.now();
     }
   });
   world.addBody(sphereBody);
@@ -394,12 +417,23 @@ const setupCamera = () => {
     0.1,
     100
   );
-  camera.position.set(0, 8, 6);
+  camera.position.set(0, 0.5, 4);
   camera.lookAt(0, 0, 0);
   scene.add(camera);
 
   // 轨道控制器
   orbitControls = new OrbitControls(camera, canvas);
+
+  // 添加控制器限制
+  // 限制相机的最小距离，防止放大过度
+  orbitControls.minDistance = 4;
+  // 限制相机的最大距离，保持z=4的视角范围
+  orbitControls.maxDistance = 10;
+  // 限制垂直旋转角度，防止看到地板背面
+  orbitControls.minPolarAngle = Math.PI * 0.1; // 防止往上看太多
+  orbitControls.maxPolarAngle = Math.PI * 0.4; // 防止往下看太多
+  // 启用阻尼效果使控制更平滑
+  orbitControls.enableDamping = true;
 };
 
 // 创建可视化物体
@@ -487,7 +521,22 @@ const animate = () => {
   oldElapsedTime = elapsedTime;
 
   // 更新物理世界
-  world.step(1 / 60, deltaTime, 3);
+  world.step(1 / 60, deltaTime);
+
+  // 处理风力变化
+  if (isBallLanded) {
+    // 检查是否需要变化风力 (每3-5秒)
+    const now = Date.now();
+    const timeSinceLastChange = now - lastWindChangeTime;
+    const changeInterval = Math.random() * 2000 + 3000; // 3-5秒
+
+    if (timeSinceLastChange > changeInterval) {
+      updateWindForceAndDirection(); // 这会更新lastWindChangeTime
+    }
+
+    // 应用风力到球体
+    applyWindForce();
+  }
 
   // 更新视觉模型位置
   sphereMesh.position.copy(sphereBody.position);
@@ -505,3 +554,119 @@ const animate = () => {
 
 // 在DOM加载完成后创建按钮
 window.addEventListener("DOMContentLoaded", createStartButton);
+
+// 随机更新风力和方向
+const updateWindForceAndDirection = () => {
+  // 随机选择一个风力值
+  const randomForceIndex = Math.floor(Math.random() * WIND_FORCES.length);
+  const newForce = WIND_FORCES[randomForceIndex];
+
+  // 随机选择一个方向
+  const randomDirectionIndex = Math.floor(
+    Math.random() * MAIN_DIRECTIONS.length
+  );
+  const newDirection = MAIN_DIRECTIONS[randomDirectionIndex];
+
+  // 更新当前风力和方向
+  currentWindForce = newForce;
+  currentDirection = newDirection;
+
+  // 更新UI
+  updateWindUI();
+
+  // 记录最后一次风力变化的时间
+  lastWindChangeTime = Date.now();
+};
+
+// 更新风力UI显示
+const updateWindUI = () => {
+  // 如果UI元素已经创建
+  const windWheel = document.getElementById("wind-wheel");
+  const windForceIndicator = document.getElementById("wind-force-indicator");
+
+  if (windWheel && windForceIndicator) {
+    // 更新风向盘
+    const directions = windWheel.querySelectorAll(".wind-direction");
+    directions.forEach((dirElement) => {
+      dirElement.classList.remove("active");
+      dirElement.classList.add("inactive");
+
+      // 获取当前方向类名
+      const dirClassName = dirElement.className.split(" ")[1]; // 例如 "north"
+
+      // 将当前选择的方向设为活跃
+      if (dirClassName.toLowerCase() === currentDirection.toLowerCase()) {
+        dirElement.classList.remove("inactive");
+        dirElement.classList.add("active");
+      }
+    });
+
+    // 更新风力指示器
+    const forceLevels = windForceIndicator.querySelectorAll(".force-level");
+    forceLevels.forEach((forceLevel, index) => {
+      forceLevel.classList.remove("active");
+      forceLevel.classList.add("inactive");
+
+      // 找到与当前风力匹配的力值索引
+      const forceIndex = WIND_FORCES.indexOf(currentWindForce);
+
+      // 如果当前等级与风力索引匹配，设为活跃
+      if (index === forceIndex) {
+        forceLevel.classList.remove("inactive");
+        forceLevel.classList.add("active");
+
+        // 更新风图标（动画）
+        const windImg = forceLevel.querySelector("img");
+        if (windImg && currentWindForce > 0) {
+          windImg.src = WindAnimatedIcon;
+        } else if (windImg) {
+          windImg.src = WindIcon;
+        }
+      } else {
+        // 更新风图标（静态）
+        const windImg = forceLevel.querySelector("img");
+        if (windImg) {
+          windImg.src = WindIcon;
+        }
+      }
+
+      // 更新风力数字显示
+      const forceNumber = forceLevel.querySelector(".force-number");
+      if (forceNumber) {
+        forceNumber.textContent = WIND_FORCES[index];
+      }
+    });
+  }
+};
+
+// 应用风力到球体
+const applyWindForce = () => {
+  if (!sphereBody || !isBallLanded) return;
+
+  let forceX = 0;
+  let forceZ = 0;
+
+  // 根据方向确定力的方向
+  switch (currentDirection) {
+    case "North":
+      forceZ = -currentWindForce;
+      break;
+    case "East":
+      forceX = currentWindForce;
+      break;
+    case "South":
+      forceZ = currentWindForce;
+      break;
+    case "West":
+      forceX = -currentWindForce;
+      break;
+  }
+
+  console.log(forceX, forceZ);
+
+  // 应用力到球体
+  sphereBody.applyForce(
+    new CANNON.Vec3(forceX, 0, forceZ),
+    sphereBody.position
+  );
+};
