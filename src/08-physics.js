@@ -5,6 +5,7 @@ import "./assets/style/physics.css";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import GrassColorTexture from "./assets/texture/grasslight-big.jpg";
 import DropEffect from "./assets/audio/drop.mp3";
+import RollEffect from "./assets/audio/roll.mp3";
 import WindIcon from "./assets/svg/wind.svg";
 import WindAnimatedIcon from "./assets/svg/wind-animated.svg";
 import NorthIcon from "./assets/svg/north.svg";
@@ -15,24 +16,14 @@ import SouthIcon from "./assets/svg/south.svg";
 import SouthWestIcon from "./assets/svg/southwest.svg";
 import WestIcon from "./assets/svg/west.svg";
 import NorthWestIcon from "./assets/svg/northwest.svg";
-import * as dat from "dat.gui";
-const gui = new dat.GUI();
-gui.domElement.style.position = "absolute";
-gui.domElement.style.left = "0";
-
-const parameters = {
-  applyWind: false,
-};
-gui.add(parameters, "applyWind");
 
 // 风力值定义（0, 3, 6, 9）
 const WIND_FORCES = [0, 3, 6, 9];
 // 主要风向定义
-const MAIN_DIRECTIONS = ["North", "East", "South", "West"];
+const MAIN_DIRECTIONS = ["North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest"];
 
-let currentDirection = "North";
-let currentWindForce = 2;
-let windChangeInterval = null;
+let currentDirection;
+let currentWindForce;
 let lastWindChangeTime = 0;
 
 // DOM元素
@@ -86,6 +77,7 @@ const wallsConfig = [
 ];
 // 音频设置
 const dropSound = new Audio(DropEffect);
+const rollSound = new Audio(RollEffect);
 let maxImpactVelocity;
 
 // 初始化标志
@@ -265,12 +257,53 @@ const playDropSound = (velocity) => {
   }
 };
 
+// 播放滚动音效
+const playRollSound = () => {
+  // 如果球未落地或未开始应用风力，不播放
+  if (!sphereBody || !isBallLanded || currentWindForce === 0) {
+    // 如果之前在播放，逐渐停止
+    if (!rollSound.paused) {
+      rollSound.volume = Math.max(0, rollSound.volume - 0.03);
+      if (rollSound.volume <= 0.05) {
+        rollSound.pause();
+        rollSound.currentTime = 0;
+      }
+    }
+    return;
+  }
+
+  // 获取球体水平速度（忽略垂直方向）
+  const velocity = sphereBody.velocity.length();
+
+  // 如果速度足够大，播放滚动音效
+  if (velocity > 0.3) {
+    // 如果未播放，开始播放
+    if (rollSound.paused) {
+      rollSound.currentTime = 0;
+      rollSound.loop = true;
+      rollSound.volume = 0;
+      rollSound.play();
+    }
+
+    // 基于速度调整音量，实现淡入效果
+    const targetVolume = Math.min(0.7, velocity / 10);
+    // 平滑过渡到目标音量
+    rollSound.volume = rollSound.volume * 0.95 + targetVolume * 0.05;
+  } else if (!rollSound.paused) {
+    // 速度不足，实现淡出效果
+    rollSound.volume = Math.max(0, rollSound.volume - 0.03);
+    if (rollSound.volume <= 0.05) {
+      rollSound.pause();
+      rollSound.currentTime = 0;
+    }
+  }
+};
+
 // 初始化物理世界
 const initPhysics = () => {
   // 物理世界
   world = new CANNON.World();
   world.broadphase = new CANNON.SAPBroadphase(world);
-  world.allowSleep = true;
   world.gravity.set(0, -9.82, 0);
 
   // 物理材质
@@ -304,14 +337,16 @@ const createPhysicsObjects = () => {
     if (collidedBody.material === planePhysicsMaterial) {
       playDropSound(velocity);
     }
-    if (velocity < 0.1) {
+    if (velocity < 0.1 && !isBallLanded) {
       // 创建风力UI元素
       createWindWheel();
       createWindForceIndicator();
       isBallLanded = true;
 
-      // 设置初始风力和方向
-      updateWindForceAndDirection();
+      // 设置初始风力和方向为北风3级
+      currentDirection = "North";
+      currentWindForce = 3;
+      updateWindUI();
 
       // 启动3-5秒后变化风力的计时
       lastWindChangeTime = Date.now();
@@ -536,6 +571,9 @@ const animate = () => {
 
     // 应用风力到球体
     applyWindForce();
+    
+    // 处理滚动音效
+    playRollSound();
   }
 
   // 更新视觉模型位置
@@ -595,7 +633,9 @@ const updateWindUI = () => {
       const dirClassName = dirElement.className.split(" ")[1]; // 例如 "north"
 
       // 将当前选择的方向设为活跃
-      if (dirClassName.toLowerCase() === currentDirection.toLowerCase()) {
+      // 将currentDirection转换为小写并移除空格以匹配类名
+      const currentDirClass = currentDirection.toLowerCase().replace(/\s+/g, '');
+      if (dirClassName === currentDirClass) {
         dirElement.classList.remove("inactive");
         dirElement.classList.add("active");
       }
@@ -645,24 +685,39 @@ const applyWindForce = () => {
 
   let forceX = 0;
   let forceZ = 0;
+  const diagonalFactor = Math.sqrt(2) / 2; // 对角线方向的力度系数
 
   // 根据方向确定力的方向
   switch (currentDirection) {
     case "North":
       forceZ = -currentWindForce;
       break;
+    case "Northeast":
+      forceX = currentWindForce * diagonalFactor;
+      forceZ = -currentWindForce * diagonalFactor;
+      break;
     case "East":
       forceX = currentWindForce;
+      break;
+    case "Southeast":
+      forceX = currentWindForce * diagonalFactor;
+      forceZ = currentWindForce * diagonalFactor;
       break;
     case "South":
       forceZ = currentWindForce;
       break;
+    case "Southwest":
+      forceX = -currentWindForce * diagonalFactor;
+      forceZ = currentWindForce * diagonalFactor;
+      break;
     case "West":
       forceX = -currentWindForce;
       break;
+    case "Northwest":
+      forceX = -currentWindForce * diagonalFactor;
+      forceZ = -currentWindForce * diagonalFactor;
+      break;
   }
-
-  console.log(forceX, forceZ);
 
   // 应用力到球体
   sphereBody.applyForce(
