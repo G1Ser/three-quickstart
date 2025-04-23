@@ -17,612 +17,536 @@ import SouthWestIcon from "./assets/svg/southwest.svg";
 import WestIcon from "./assets/svg/west.svg";
 import NorthWestIcon from "./assets/svg/northwest.svg";
 
-// 风力值定义（0, 3, 6, 9）
-const WIND_FORCES = [0, 3, 6, 9];
-// 主要风向定义
-const MAIN_DIRECTIONS = ["North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest"];
-
-let currentDirection;
-let currentWindForce;
-let lastWindChangeTime = 0;
-
-// DOM元素
-const canvas = document.querySelector(".webgl");
-
-// 物理世界设置
-let world;
-let sphereBody;
-let planeBody;
-
-// 物理材质
-let spherePhysicsMaterial;
-let planePhysicsMaterial;
-let jellyPhysicsMaterial;
-
-// Three.js场景元素
-let scene;
-let camera;
-let renderer;
-let orbitControls;
-let sphereMesh;
-let planeMesh;
-
-// 场景属性
-const sphereRadius = 0.3;
-const sphereHeight = 5;
-const planeWidth = 10;
-const planeHeight = 10;
-const planeQuaternion = -Math.PI / 2;
-const wallsConfig = [
-  // 左墙
-  {
-    position: [-planeWidth / 2, planeHeight / 10, 0],
-    rotation: [0, planeQuaternion * 3, 0],
-  },
-  // 右墙
-  {
-    position: [planeWidth / 2, planeHeight / 10, 0],
-    rotation: [0, planeQuaternion, 0],
-  },
-  // 前墙
-  {
-    position: [0, planeHeight / 10, planeWidth / 2],
-    rotation: [planeQuaternion * 2, 0, 0],
-  },
-  // 后墙
-  {
-    position: [0, planeHeight / 10, -planeWidth / 2],
-    rotation: [0, 0, 0],
-  },
-];
-// 音频设置
-const dropSound = new Audio(DropEffect);
-const rollSound = new Audio(RollEffect);
-let maxImpactVelocity;
-
-// 初始化标志
-let isInitialized = false;
-// 球落地标志
-let isBallLanded = false;
-
-// 游戏启动函数
-const startGame = () => {
-  // 移除开始按钮
-  const startButton = document.getElementById("start-button");
-  if (!startButton) return;
-  startButton.classList.add("fade-out");
-  setTimeout(() => {
-    if (startButton.parentNode) {
-      startButton.parentNode.removeChild(startButton);
-    }
-  }, 500);
-
-  // 初始化物理场景
-  if (!isInitialized) {
-    initPhysics();
-    initScene();
-    animate();
-    isInitialized = true;
-  }
-};
-
-// 创建开始按钮
-const createStartButton = () => {
-  const startButton = document.createElement("button");
-  startButton.id = "start-button";
-  startButton.textContent = "开始体验";
-  startButton.addEventListener("click", startGame);
-  document.body.appendChild(startButton);
-};
-
-// 创建风力指示器
-const createWindForceIndicator = () => {
-  const windForceIndicator = document.createElement("div");
-  windForceIndicator.id = "wind-force-indicator";
-  windForceIndicator.classList.add("fade-in");
-
-  // 添加标题
-  const title = document.createElement("h3");
-  title.className = "wind-title";
-  title.textContent = "风力";
-  windForceIndicator.appendChild(title);
-
-  // 创建风力级别容器
-  const forceLevelsContainer = document.createElement("div");
-  forceLevelsContainer.className = "force-levels-container";
-
-  // 创建四个风力级别
-  [0, 1, 2, 3].forEach((index) => {
-    const forceLevel = document.createElement("div");
-    const forceValue = WIND_FORCES[index]; // 获取实际风力值
-    forceLevel.className = `force-level ${
-      currentWindForce === forceValue ? "active" : "inactive"
-    }`;
-    forceLevel.setAttribute("data-force", index);
-
-    // 添加风图标 (使用img标签加载SVG)
-    const windImg = document.createElement("img");
-    if (currentWindForce === forceValue && forceValue > 0) {
-      windImg.src = WindAnimatedIcon;
-    } else {
-      windImg.src = WindIcon;
-    }
-    forceLevel.appendChild(windImg);
-
-    // 添加级别数字
-    const forceNumber = document.createElement("div");
-    forceNumber.className = "force-number";
-    forceNumber.textContent = forceValue; // 显示实际风力值
-    forceLevel.appendChild(forceNumber);
-    forceLevelsContainer.appendChild(forceLevel);
-  });
-  windForceIndicator.appendChild(forceLevelsContainer);
-  document.body.appendChild(windForceIndicator);
-};
-
-// 创建风力盘
-const createWindWheel = () => {
-  const windWheel = document.createElement("div");
-  windWheel.id = "wind-wheel";
-  windWheel.classList.add("fade-in");
-
-  // 添加标题
-  const title = document.createElement("h3");
-  title.className = "wind-title";
-  title.textContent = "风向";
-  windWheel.appendChild(title);
-
-  // 创建罗盘容器
-  const compass = document.createElement("div");
-  compass.className = "wind-compass";
-
-  // 定义所有方向及其对应的SVG图标
-  const directions = [
-    {
-      name: "North",
-      className: "north",
-      icon: NorthIcon,
-    },
-    {
-      name: "Northeast",
-      className: "northeast",
-      icon: NorthEastIcon,
-    },
-    {
-      name: "East",
-      className: "east",
-      icon: EastIcon,
-    },
-    {
-      name: "Southeast",
-      className: "southeast",
-      icon: SouthEastIcon,
-    },
-    {
-      name: "South",
-      className: "south",
-      icon: SouthIcon,
-    },
-    {
-      name: "Southwest",
-      className: "southwest",
-      icon: SouthWestIcon,
-    },
-    {
-      name: "West",
-      className: "west",
-      icon: WestIcon,
-    },
-    {
-      name: "Northwest",
-      className: "northwest",
-      icon: NorthWestIcon,
-    },
-  ];
-
-  // 创建所有方向的箭头
-  directions.forEach((dir) => {
-    const dirElement = document.createElement("div");
-    dirElement.className = `wind-direction ${dir.className} ${
-      currentDirection === dir.name ? "active" : "inactive"
-    }`;
-
-    // 使用img元素加载SVG图标
-    const dirImg = document.createElement("img");
-    dirImg.src = dir.icon;
-    dirElement.appendChild(dirImg);
-
-    compass.appendChild(dirElement);
-  });
-
-  // 添加中心圆圈
-  const centerCircle = document.createElement("div");
-  centerCircle.className = "wind-center";
-  compass.appendChild(centerCircle);
-
-  windWheel.appendChild(compass);
-  document.body.appendChild(windWheel);
-};
-
-// 播放碰撞音效
-const playDropSound = (velocity) => {
-  if (!maxImpactVelocity) {
-    maxImpactVelocity = velocity;
+/**
+ * 物理世界类 - 负责物理引擎和物体碰撞
+ */
+class PhysicsWorld {
+  constructor(config) {
+    this.config = config;
+    this.world = null;
+    this.sphereBody = null;
+    this.planeBody = null;
+    this.spherePhysicsMaterial = null;
+    this.planePhysicsMaterial = null;
+    this.jellyPhysicsMaterial = null;
+    this.maxImpactVelocity = null;
+    this.isBallLanded = false;
+    this.onBallLanded = null;
+    this.dropSound = new Audio(DropEffect);
+    this.rollSound = new Audio(RollEffect);
+    
+    this.init();
   }
 
-  if (velocity > 1.5) {
-    dropSound.volume = velocity / maxImpactVelocity;
-    dropSound.currentTime = 0.9;
-    dropSound.play();
-  }
-};
+  init() {
+    // 物理世界
+    this.world = new CANNON.World();
+    this.world.broadphase = new CANNON.SAPBroadphase(this.world);
+    this.world.gravity.set(0, -9.82, 0);
 
-// 播放滚动音效
-const playRollSound = () => {
-  // 如果球未落地或未开始应用风力，不播放
-  if (!sphereBody || !isBallLanded || currentWindForce === 0) {
-    // 如果之前在播放，逐渐停止
-    if (!rollSound.paused) {
-      rollSound.volume = Math.max(0, rollSound.volume - 0.03);
-      if (rollSound.volume <= 0.05) {
-        rollSound.pause();
-        rollSound.currentTime = 0;
+    // 物理材质
+    this.spherePhysicsMaterial = new CANNON.Material("sphere");
+    this.planePhysicsMaterial = new CANNON.Material("plane");
+    this.jellyPhysicsMaterial = new CANNON.Material("jelly");
+
+    // 创建物理对象
+    this.createPhysicsObjects();
+
+    // 设置材质碰撞参数
+    this.setupContactMaterials();
+  }
+
+  createPhysicsObjects() {
+    const { sphereRadius, sphereHeight, planeQuaternion, wallsConfig } = this.config;
+    
+    // 创建球体
+    const sphereShape = new CANNON.Sphere(sphereRadius);
+    this.sphereBody = new CANNON.Body({
+      mass: 1,
+      shape: sphereShape,
+      position: new CANNON.Vec3(0, sphereHeight, 0),
+      linearDamping: 0.5,
+      material: this.spherePhysicsMaterial,
+    });
+
+    // 添加碰撞事件监听器
+    this.sphereBody.addEventListener("collide", (collision) => {
+      const collidedBody = collision.body;
+      const velocity = collision.contact.getImpactVelocityAlongNormal();
+      if (collidedBody.material === this.planePhysicsMaterial) {
+        this.playDropSound(velocity);
       }
-    }
-    return;
-  }
+      if (velocity < 0.1 && !this.isBallLanded) {
+        this.isBallLanded = true;
+        if (this.onBallLanded) {
+          this.onBallLanded();
+        }
+      }
+    });
+    this.world.addBody(this.sphereBody);
 
-  // 获取球体水平速度（忽略垂直方向）
-  const velocity = sphereBody.velocity.length();
-
-  // 如果速度足够大，播放滚动音效
-  if (velocity > 0.3) {
-    // 如果未播放，开始播放
-    if (rollSound.paused) {
-      rollSound.currentTime = 0;
-      rollSound.loop = true;
-      rollSound.volume = 0;
-      rollSound.play();
-    }
-
-    // 基于速度调整音量，实现淡入效果
-    const targetVolume = Math.min(0.7, velocity / 10);
-    // 平滑过渡到目标音量
-    rollSound.volume = rollSound.volume * 0.95 + targetVolume * 0.05;
-  } else if (!rollSound.paused) {
-    // 速度不足，实现淡出效果
-    rollSound.volume = Math.max(0, rollSound.volume - 0.03);
-    if (rollSound.volume <= 0.05) {
-      rollSound.pause();
-      rollSound.currentTime = 0;
-    }
-  }
-};
-
-// 初始化物理世界
-const initPhysics = () => {
-  // 物理世界
-  world = new CANNON.World();
-  world.broadphase = new CANNON.SAPBroadphase(world);
-  world.gravity.set(0, -9.82, 0);
-
-  // 物理材质
-  spherePhysicsMaterial = new CANNON.Material("sphere");
-  planePhysicsMaterial = new CANNON.Material("plane");
-  jellyPhysicsMaterial = new CANNON.Material("jelly");
-
-  // 创建物理对象
-  createPhysicsObjects();
-
-  // 设置材质碰撞参数
-  setupContactMaterials();
-};
-
-// 创建物理对象
-const createPhysicsObjects = () => {
-  // 创建球体
-  const sphereShape = new CANNON.Sphere(sphereRadius);
-  sphereBody = new CANNON.Body({
-    mass: 1,
-    shape: sphereShape,
-    position: new CANNON.Vec3(0, sphereHeight, 0),
-    linearDamping: 0.5,
-    material: spherePhysicsMaterial,
-  });
-
-  // 添加碰撞事件监听器
-  sphereBody.addEventListener("collide", (collision) => {
-    const collidedBody = collision.body;
-    const velocity = collision.contact.getImpactVelocityAlongNormal();
-    if (collidedBody.material === planePhysicsMaterial) {
-      playDropSound(velocity);
-    }
-    if (velocity < 0.1 && !isBallLanded) {
-      // 创建风力UI元素
-      createWindWheel();
-      createWindForceIndicator();
-      isBallLanded = true;
-
-      // 设置初始风力和方向为北风3级
-      currentDirection = "North";
-      currentWindForce = 3;
-      updateWindUI();
-
-      // 启动3-5秒后变化风力的计时
-      lastWindChangeTime = Date.now();
-    }
-  });
-  world.addBody(sphereBody);
-
-  // 创建平面
-  const planeShape = new CANNON.Plane();
-  planeBody = new CANNON.Body({
-    mass: 0,
-    shape: planeShape,
-    material: planePhysicsMaterial,
-  });
-  planeBody.quaternion.setFromEuler(planeQuaternion, 0, 0);
-  world.addBody(planeBody);
-
-  // 添加空气墙
-
-  // 创建并添加所有墙
-  wallsConfig.forEach((config) => {
-    const wallBody = new CANNON.Body({
+    // 创建平面
+    const planeShape = new CANNON.Plane();
+    this.planeBody = new CANNON.Body({
       mass: 0,
       shape: planeShape,
-      position: new CANNON.Vec3(...config.position),
-      material: jellyPhysicsMaterial,
+      material: this.planePhysicsMaterial,
     });
-    wallBody.quaternion.setFromEuler(...config.rotation);
-    world.addBody(wallBody);
-  });
-};
+    this.planeBody.quaternion.setFromEuler(planeQuaternion, 0, 0);
+    this.world.addBody(this.planeBody);
 
-// 设置接触材质
-const setupContactMaterials = () => {
-  // 设置小球和地面之间的弹撞系数
-  const contactMaterial = new CANNON.ContactMaterial(
-    spherePhysicsMaterial,
-    planePhysicsMaterial,
-    {
-      restitution: 0.6, // 弹性系数
-      friction: 0.4, // 摩擦系数
-    }
-  );
-  world.addContactMaterial(contactMaterial);
-
-  // 设置小球和空气墙之间的高弹性碰撞
-  const jellyContactMaterial = new CANNON.ContactMaterial(
-    spherePhysicsMaterial,
-    jellyPhysicsMaterial,
-    {
-      restitution: 0.8, // 高弹性系数
-      friction: 0.1, // 低摩擦系数
-    }
-  );
-  world.addContactMaterial(jellyContactMaterial);
-};
-
-// 初始化Three.js场景
-const initScene = () => {
-  // 创建场景
-  scene = new THREE.Scene();
-
-  // 添加蓝天背景
-  const skyColor = 0xd1edfe; // 浅蓝色
-  scene.background = new THREE.Color(skyColor);
-
-  // 设置光照
-  setupLights();
-
-  // 设置相机
-  setupCamera();
-
-  // 创建可视化物体
-  createVisualObjects();
-
-  // 设置渲染器
-  setupRenderer();
-
-  // 添加窗口调整事件
-  setupEventListeners();
-};
-
-// 设置光照
-const setupLights = () => {
-  // 环境光
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-  scene.add(ambientLight);
-
-  // 平行光源（用于产生阴影）
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-  directionalLight.position.set(2, 2, 1);
-  directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.width = 2048;
-  directionalLight.shadow.mapSize.height = 2048;
-  scene.add(directionalLight);
-};
-
-// 设置相机
-const setupCamera = () => {
-  camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    100
-  );
-  camera.position.set(0, 0.5, 4);
-  camera.lookAt(0, 0, 0);
-  scene.add(camera);
-
-  // 轨道控制器
-  orbitControls = new OrbitControls(camera, canvas);
-
-  // 添加控制器限制
-  // 限制相机的最小距离，防止放大过度
-  orbitControls.minDistance = 4;
-  // 限制相机的最大距离，保持z=4的视角范围
-  orbitControls.maxDistance = 10;
-  // 限制垂直旋转角度，防止看到地板背面
-  orbitControls.minPolarAngle = Math.PI * 0.1; // 防止往上看太多
-  orbitControls.maxPolarAngle = Math.PI * 0.4; // 防止往下看太多
-  // 启用阻尼效果使控制更平滑
-  orbitControls.enableDamping = true;
-};
-
-// 创建可视化物体
-const createVisualObjects = () => {
-  // 球体
-  const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 32, 32);
-  const sphereMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    metalness: 0.1,
-    roughness: 0,
-    transmission: 0.9, // 透明度
-    ior: 1.5, // 折射率 (玻璃约为1.5)
-    thickness: 1, // 厚度
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.1,
-  });
-  sphereMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
-  sphereMesh.castShadow = true;
-  sphereMesh.position.copy(sphereBody.position);
-  scene.add(sphereMesh);
-
-  // 平面
-  const planeGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-
-  // 加载草地纹理
-  const textureLoader = new THREE.TextureLoader();
-  const grassTexture = textureLoader.load(GrassColorTexture);
-  grassTexture.wrapS = THREE.RepeatWrapping;
-  grassTexture.wrapT = THREE.RepeatWrapping;
-  grassTexture.repeat.set(5, 5);
-
-  const planeMaterial = new THREE.MeshStandardMaterial({
-    map: grassTexture,
-  });
-  const wallGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight / 5);
-  // 空气墙材质
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    color: 0x88ccff,
-    transparent: true,
-    opacity: 0.2,
-    side: THREE.DoubleSide,
-  });
-  wallsConfig.forEach((config) => {
-    const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
-    wallMesh.position.set(...config.position);
-    wallMesh.rotation.set(...config.rotation);
-    scene.add(wallMesh);
-  });
-  planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
-  planeMesh.rotation.set(planeQuaternion, 0, 0);
-  planeMesh.receiveShadow = true;
-  scene.add(planeMesh);
-};
-
-// 设置渲染器
-const setupRenderer = () => {
-  renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-  });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  // 开启阴影
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-};
-
-// 设置事件监听器
-const setupEventListeners = () => {
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  });
-};
-
-// 动画循环
-let oldElapsedTime = 0;
-const clock = new THREE.Clock();
-
-const animate = () => {
-  const elapsedTime = clock.getElapsedTime();
-  const deltaTime = elapsedTime - oldElapsedTime;
-  oldElapsedTime = elapsedTime;
-
-  // 更新物理世界
-  world.step(1 / 60, deltaTime);
-
-  // 处理风力变化
-  if (isBallLanded) {
-    // 检查是否需要变化风力 (每3-5秒)
-    const now = Date.now();
-    const timeSinceLastChange = now - lastWindChangeTime;
-    const changeInterval = Math.random() * 2000 + 3000; // 3-5秒
-
-    if (timeSinceLastChange > changeInterval) {
-      updateWindForceAndDirection(); // 这会更新lastWindChangeTime
-    }
-
-    // 应用风力到球体
-    applyWindForce();
-    
-    // 处理滚动音效
-    playRollSound();
+    // 创建并添加所有墙
+    wallsConfig.forEach((config) => {
+      const wallBody = new CANNON.Body({
+        mass: 0,
+        shape: planeShape,
+        position: new CANNON.Vec3(...config.position),
+        material: this.jellyPhysicsMaterial,
+      });
+      wallBody.quaternion.setFromEuler(...config.rotation);
+      this.world.addBody(wallBody);
+    });
   }
 
-  // 更新视觉模型位置
-  sphereMesh.position.copy(sphereBody.position);
-  sphereMesh.quaternion.copy(sphereBody.quaternion);
+  setupContactMaterials() {
+    // 设置小球和地面之间的弹撞系数
+    const contactMaterial = new CANNON.ContactMaterial(
+      this.spherePhysicsMaterial,
+      this.planePhysicsMaterial,
+      {
+        restitution: 0.6, // 弹性系数
+        friction: 0.4, // 摩擦系数
+      }
+    );
+    this.world.addContactMaterial(contactMaterial);
 
-  // 更新控制器
-  orbitControls.update();
+    // 设置小球和空气墙之间的高弹性碰撞
+    const jellyContactMaterial = new CANNON.ContactMaterial(
+      this.spherePhysicsMaterial,
+      this.jellyPhysicsMaterial,
+      {
+        restitution: 0.8, // 高弹性系数
+        friction: 0.1, // 低摩擦系数
+      }
+    );
+    this.world.addContactMaterial(jellyContactMaterial);
+  }
 
-  // 渲染场景
-  renderer.render(scene, camera);
+  // 播放碰撞音效
+  playDropSound(velocity) {
+    if (!this.maxImpactVelocity) {
+      this.maxImpactVelocity = velocity;
+    }
 
-  // 请求下一帧
-  window.requestAnimationFrame(animate);
-};
+    if (velocity > 1.5) {
+      this.dropSound.volume = velocity / this.maxImpactVelocity;
+      this.dropSound.currentTime = 0.9;
+      this.dropSound.play();
+    }
+  }
 
-// 在DOM加载完成后创建按钮
-window.addEventListener("DOMContentLoaded", createStartButton);
+  // 播放滚动音效
+  playRollSound(windForce) {
+    // 如果球未落地或未开始应用风力，不播放
+    if (!this.sphereBody || !this.isBallLanded || windForce === 0) {
+      // 如果之前在播放，逐渐停止
+      if (!this.rollSound.paused) {
+        this.rollSound.volume = Math.max(0, this.rollSound.volume - 0.03);
+        if (this.rollSound.volume <= 0.05) {
+          this.rollSound.pause();
+          this.rollSound.currentTime = 0;
+        }
+      }
+      return;
+    }
 
-// 随机更新风力和方向
-const updateWindForceAndDirection = () => {
-  // 随机选择一个风力值
-  const randomForceIndex = Math.floor(Math.random() * WIND_FORCES.length);
-  const newForce = WIND_FORCES[randomForceIndex];
+    // 获取球体水平速度（忽略垂直方向）
+    const velocity = this.sphereBody.velocity.length();
 
-  // 随机选择一个方向
-  const randomDirectionIndex = Math.floor(
-    Math.random() * MAIN_DIRECTIONS.length
-  );
-  const newDirection = MAIN_DIRECTIONS[randomDirectionIndex];
+    // 如果速度足够大，播放滚动音效
+    if (velocity > 0.3) {
+      // 如果未播放，开始播放
+      if (this.rollSound.paused) {
+        this.rollSound.currentTime = 0;
+        this.rollSound.loop = true;
+        this.rollSound.volume = 0;
+        this.rollSound.play();
+      }
 
-  // 更新当前风力和方向
-  currentWindForce = newForce;
-  currentDirection = newDirection;
+      // 基于速度调整音量，实现淡入效果
+      const targetVolume = Math.min(0.7, velocity / 10);
+      // 平滑过渡到目标音量
+      this.rollSound.volume = this.rollSound.volume * 0.95 + targetVolume * 0.05;
+    } else if (!this.rollSound.paused) {
+      // 速度不足，实现淡出效果
+      this.rollSound.volume = Math.max(0, this.rollSound.volume - 0.03);
+      if (this.rollSound.volume <= 0.05) {
+        this.rollSound.pause();
+        this.rollSound.currentTime = 0;
+      }
+    }
+  }
 
-  // 更新UI
-  updateWindUI();
+  update(deltaTime) {
+    this.world.step(1 / 60, deltaTime);
+  }
 
-  // 记录最后一次风力变化的时间
-  lastWindChangeTime = Date.now();
-};
+  applyWindForce(direction, force) {
+    if (!this.sphereBody || !this.isBallLanded) return;
 
-// 更新风力UI显示
-const updateWindUI = () => {
-  // 如果UI元素已经创建
-  const windWheel = document.getElementById("wind-wheel");
-  const windForceIndicator = document.getElementById("wind-force-indicator");
+    let forceX = 0;
+    let forceZ = 0;
+    const diagonalFactor = Math.sqrt(2) / 2; // 对角线方向的力度系数
 
-  if (windWheel && windForceIndicator) {
+    // 根据方向确定力的方向
+    switch (direction) {
+      case "North":
+        forceZ = -force;
+        break;
+      case "Northeast":
+        forceX = force * diagonalFactor;
+        forceZ = -force * diagonalFactor;
+        break;
+      case "East":
+        forceX = force;
+        break;
+      case "Southeast":
+        forceX = force * diagonalFactor;
+        forceZ = force * diagonalFactor;
+        break;
+      case "South":
+        forceZ = force;
+        break;
+      case "Southwest":
+        forceX = -force * diagonalFactor;
+        forceZ = force * diagonalFactor;
+        break;
+      case "West":
+        forceX = -force;
+        break;
+      case "Northwest":
+        forceX = -force * diagonalFactor;
+        forceZ = -force * diagonalFactor;
+        break;
+    }
+
+    // 应用力到球体
+    this.sphereBody.applyForce(
+      new CANNON.Vec3(forceX, 0, forceZ),
+      this.sphereBody.position
+    );
+  }
+}
+
+/**
+ * Three.js 场景类 - 负责3D渲染和相机控制
+ */
+class Scene {
+  constructor(canvas, config, physicsWorld) {
+    this.canvas = canvas;
+    this.config = config;
+    this.physicsWorld = physicsWorld;
+    this.scene = null;
+    this.camera = null;
+    this.renderer = null;
+    this.orbitControls = null;
+    this.sphereMesh = null;
+    this.planeMesh = null;
+    
+    this.init();
+  }
+
+  init() {
+    // 创建场景
+    this.scene = new THREE.Scene();
+
+    // 添加蓝天背景
+    const skyColor = 0xd1edfe; // 浅蓝色
+    this.scene.background = new THREE.Color(skyColor);
+
+    // 设置光照
+    this.setupLights();
+
+    // 设置相机
+    this.setupCamera();
+
+    // 创建可视化物体
+    this.createVisualObjects();
+
+    // 设置渲染器
+    this.setupRenderer();
+
+    // 添加窗口调整事件
+    this.setupEventListeners();
+  }
+
+  setupLights() {
+    // 环境光
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    this.scene.add(ambientLight);
+
+    // 平行光源（用于产生阴影）
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(2, 2, 1);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    this.scene.add(directionalLight);
+  }
+
+  setupCamera() {
+    this.camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    this.camera.position.set(0, 0.5, 4);
+    this.camera.lookAt(0, 0, 0);
+    this.scene.add(this.camera);
+
+    // 轨道控制器
+    this.orbitControls = new OrbitControls(this.camera, this.canvas);
+
+    // 添加控制器限制
+    this.orbitControls.minDistance = 4;
+    this.orbitControls.maxDistance = 10;
+    this.orbitControls.minPolarAngle = Math.PI * 0.1;
+    this.orbitControls.maxPolarAngle = Math.PI * 0.4;
+    this.orbitControls.enableDamping = true;
+  }
+
+  createVisualObjects() {
+    const { sphereRadius, planeWidth, planeHeight, planeQuaternion, wallsConfig } = this.config;
+    
+    // 球体
+    const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 32, 32);
+    const sphereMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      metalness: 0.1,
+      roughness: 0,
+      transmission: 0.9,
+      ior: 1.5,
+      thickness: 1,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.1,
+    });
+    this.sphereMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    this.sphereMesh.castShadow = true;
+    this.sphereMesh.position.copy(this.physicsWorld.sphereBody.position);
+    this.scene.add(this.sphereMesh);
+
+    // 平面
+    const planeGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+
+    // 加载草地纹理
+    const textureLoader = new THREE.TextureLoader();
+    const grassTexture = textureLoader.load(GrassColorTexture);
+    grassTexture.wrapS = THREE.RepeatWrapping;
+    grassTexture.wrapT = THREE.RepeatWrapping;
+    grassTexture.repeat.set(5, 5);
+
+    const planeMaterial = new THREE.MeshStandardMaterial({
+      map: grassTexture,
+    });
+    const wallGeometry = new THREE.PlaneGeometry(planeWidth, planeHeight / 5);
+    // 空气墙材质
+    const wallMaterial = new THREE.MeshStandardMaterial({
+      color: 0x88ccff,
+      transparent: true,
+      opacity: 0.2,
+      side: THREE.DoubleSide,
+    });
+    wallsConfig.forEach((config) => {
+      const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+      wallMesh.position.set(...config.position);
+      wallMesh.rotation.set(...config.rotation);
+      this.scene.add(wallMesh);
+    });
+    this.planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+    this.planeMesh.rotation.set(planeQuaternion, 0, 0);
+    this.planeMesh.receiveShadow = true;
+    this.scene.add(this.planeMesh);
+  }
+
+  setupRenderer() {
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: true,
+    });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    // 开启阴影
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  }
+
+  setupEventListeners() {
+    window.addEventListener("resize", () => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  }
+
+  update() {
+    // 更新视觉模型位置
+    this.sphereMesh.position.copy(this.physicsWorld.sphereBody.position);
+    this.sphereMesh.quaternion.copy(this.physicsWorld.sphereBody.quaternion);
+
+    // 更新控制器
+    this.orbitControls.update();
+
+    // 渲染场景
+    this.renderer.render(this.scene, this.camera);
+  }
+}
+
+/**
+ * UI类 - 负责界面元素管理
+ */
+class UI {
+  constructor() {
+    this.windIcons = {
+      static: WindIcon,
+      animated: WindAnimatedIcon,
+      directions: {
+        North: NorthIcon,
+        Northeast: NorthEastIcon,
+        East: EastIcon,
+        Southeast: SouthEastIcon,
+        South: SouthIcon,
+        Southwest: SouthWestIcon,
+        West: WestIcon,
+        Northwest: NorthWestIcon
+      }
+    };
+  }
+  
+  createStartButton(onStart) {
+    const startButton = document.createElement("button");
+    startButton.id = "start-button";
+    startButton.textContent = "开始体验";
+    startButton.addEventListener("click", () => {
+      this.removeStartButton(startButton);
+      onStart();
+    });
+    document.body.appendChild(startButton);
+    return startButton;
+  }
+  
+  removeStartButton(button) {
+    button.classList.add("fade-out");
+    setTimeout(() => {
+      if (button.parentNode) {
+        button.parentNode.removeChild(button);
+      }
+    }, 500);
+  }
+
+  createWindForceIndicator(currentWindForce, windForces) {
+    const windForceIndicator = document.createElement("div");
+    windForceIndicator.id = "wind-force-indicator";
+    windForceIndicator.classList.add("fade-in");
+
+    // 添加标题
+    const title = document.createElement("h3");
+    title.className = "wind-title";
+    title.textContent = "风力";
+    windForceIndicator.appendChild(title);
+
+    // 创建风力级别容器
+    const forceLevelsContainer = document.createElement("div");
+    forceLevelsContainer.className = "force-levels-container";
+
+    // 创建四个风力级别
+    [0, 1, 2, 3].forEach((index) => {
+      const forceLevel = document.createElement("div");
+      const forceValue = windForces[index];
+      forceLevel.className = `force-level ${
+        currentWindForce === forceValue ? "active" : "inactive"
+      }`;
+      forceLevel.setAttribute("data-force", index);
+
+      // 添加风图标
+      const windImg = document.createElement("img");
+      if (currentWindForce === forceValue && forceValue > 0) {
+        windImg.src = this.windIcons.animated;
+      } else {
+        windImg.src = this.windIcons.static;
+      }
+      forceLevel.appendChild(windImg);
+
+      // 添加级别数字
+      const forceNumber = document.createElement("div");
+      forceNumber.className = "force-number";
+      forceNumber.textContent = forceValue;
+      forceLevel.appendChild(forceNumber);
+      forceLevelsContainer.appendChild(forceLevel);
+    });
+    windForceIndicator.appendChild(forceLevelsContainer);
+    document.body.appendChild(windForceIndicator);
+    
+    return windForceIndicator;
+  }
+
+  createWindWheel(currentDirection) {
+    const windWheel = document.createElement("div");
+    windWheel.id = "wind-wheel";
+    windWheel.classList.add("fade-in");
+
+    // 添加标题
+    const title = document.createElement("h3");
+    title.className = "wind-title";
+    title.textContent = "风向";
+    windWheel.appendChild(title);
+
+    // 创建罗盘容器
+    const compass = document.createElement("div");
+    compass.className = "wind-compass";
+
+    // 定义所有方向
+    const directions = [
+      { name: "North", className: "north" },
+      { name: "Northeast", className: "northeast" },
+      { name: "East", className: "east" },
+      { name: "Southeast", className: "southeast" },
+      { name: "South", className: "south" },
+      { name: "Southwest", className: "southwest" },
+      { name: "West", className: "west" },
+      { name: "Northwest", className: "northwest" }
+    ];
+
+    // 创建所有方向的箭头
+    directions.forEach((dir) => {
+      const dirElement = document.createElement("div");
+      dirElement.className = `wind-direction ${dir.className} ${
+        currentDirection === dir.name ? "active" : "inactive"
+      }`;
+
+      // 使用img元素加载SVG图标
+      const dirImg = document.createElement("img");
+      dirImg.src = this.windIcons.directions[dir.name];
+      dirElement.appendChild(dirImg);
+
+      compass.appendChild(dirElement);
+    });
+
+    // 添加中心圆圈
+    const centerCircle = document.createElement("div");
+    centerCircle.className = "wind-center";
+    compass.appendChild(centerCircle);
+
+    windWheel.appendChild(compass);
+    document.body.appendChild(windWheel);
+    
+    return windWheel;
+  }
+
+  updateWindUI(windWheel, windForceIndicator, currentDirection, currentWindForce, windForces) {
+    if (!windWheel || !windForceIndicator) return;
+    
     // 更新风向盘
     const directions = windWheel.querySelectorAll(".wind-direction");
     directions.forEach((dirElement) => {
@@ -633,7 +557,6 @@ const updateWindUI = () => {
       const dirClassName = dirElement.className.split(" ")[1]; // 例如 "north"
 
       // 将当前选择的方向设为活跃
-      // 将currentDirection转换为小写并移除空格以匹配类名
       const currentDirClass = currentDirection.toLowerCase().replace(/\s+/g, '');
       if (dirClassName === currentDirClass) {
         dirElement.classList.remove("inactive");
@@ -648,7 +571,7 @@ const updateWindUI = () => {
       forceLevel.classList.add("inactive");
 
       // 找到与当前风力匹配的力值索引
-      const forceIndex = WIND_FORCES.indexOf(currentWindForce);
+      const forceIndex = windForces.indexOf(currentWindForce);
 
       // 如果当前等级与风力索引匹配，设为活跃
       if (index === forceIndex) {
@@ -658,70 +581,179 @@ const updateWindUI = () => {
         // 更新风图标（动画）
         const windImg = forceLevel.querySelector("img");
         if (windImg && currentWindForce > 0) {
-          windImg.src = WindAnimatedIcon;
+          windImg.src = this.windIcons.animated;
         } else if (windImg) {
-          windImg.src = WindIcon;
+          windImg.src = this.windIcons.static;
         }
       } else {
         // 更新风图标（静态）
         const windImg = forceLevel.querySelector("img");
         if (windImg) {
-          windImg.src = WindIcon;
+          windImg.src = this.windIcons.static;
         }
       }
 
       // 更新风力数字显示
       const forceNumber = forceLevel.querySelector(".force-number");
       if (forceNumber) {
-        forceNumber.textContent = WIND_FORCES[index];
+        forceNumber.textContent = windForces[index];
       }
     });
   }
-};
+}
 
-// 应用风力到球体
-const applyWindForce = () => {
-  if (!sphereBody || !isBallLanded) return;
-
-  let forceX = 0;
-  let forceZ = 0;
-  const diagonalFactor = Math.sqrt(2) / 2; // 对角线方向的力度系数
-
-  // 根据方向确定力的方向
-  switch (currentDirection) {
-    case "North":
-      forceZ = -currentWindForce;
-      break;
-    case "Northeast":
-      forceX = currentWindForce * diagonalFactor;
-      forceZ = -currentWindForce * diagonalFactor;
-      break;
-    case "East":
-      forceX = currentWindForce;
-      break;
-    case "Southeast":
-      forceX = currentWindForce * diagonalFactor;
-      forceZ = currentWindForce * diagonalFactor;
-      break;
-    case "South":
-      forceZ = currentWindForce;
-      break;
-    case "Southwest":
-      forceX = -currentWindForce * diagonalFactor;
-      forceZ = currentWindForce * diagonalFactor;
-      break;
-    case "West":
-      forceX = -currentWindForce;
-      break;
-    case "Northwest":
-      forceX = -currentWindForce * diagonalFactor;
-      forceZ = -currentWindForce * diagonalFactor;
-      break;
+/**
+ * 风力系统类 - 管理风向和风力
+ */
+class WindSystem {
+  constructor(physicsWorld, ui) {
+    this.physicsWorld = physicsWorld;
+    this.ui = ui;
+    this.windForces = [0, 3, 6, 9]; // 风力值定义
+    this.directions = ["North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest"]; // 风向定义
+    this.currentDirection = "North"; // 初始风向
+    this.currentWindForce = 3; // 初始风力
+    this.lastWindChangeTime = 0;
+    this.windWheel = null;
+    this.windForceIndicator = null;
+    this.isActive = false;
   }
 
-  // 应用力到球体
-  sphereBody.applyForce(
-    new CANNON.Vec3(forceX, 0, forceZ),
-    sphereBody.position
-  );
-};
+  activate() {
+    this.isActive = true;
+    this.windWheel = this.ui.createWindWheel(this.currentDirection);
+    this.windForceIndicator = this.ui.createWindForceIndicator(this.currentWindForce, this.windForces);
+    this.lastWindChangeTime = Date.now();
+  }
+
+  updateWindForceAndDirection() {
+    // 随机选择一个风力值
+    const randomForceIndex = Math.floor(Math.random() * this.windForces.length);
+    const newForce = this.windForces[randomForceIndex];
+
+    // 随机选择一个方向
+    const randomDirectionIndex = Math.floor(Math.random() * this.directions.length);
+    const newDirection = this.directions[randomDirectionIndex];
+
+    // 更新当前风力和方向
+    this.currentWindForce = newForce;
+    this.currentDirection = newDirection;
+
+    // 更新UI
+    this.ui.updateWindUI(this.windWheel, this.windForceIndicator, this.currentDirection, this.currentWindForce, this.windForces);
+
+    // 记录最后一次风力变化的时间
+    this.lastWindChangeTime = Date.now();
+  }
+
+  update() {
+    if (!this.isActive) return;
+    
+    // 检查是否需要变化风力 (每3-5秒)
+    const now = Date.now();
+    const timeSinceLastChange = now - this.lastWindChangeTime;
+    const changeInterval = Math.random() * 2000 + 3000; // 3-5秒
+
+    if (timeSinceLastChange > changeInterval) {
+      this.updateWindForceAndDirection();
+    }
+
+    // 应用风力到球体
+    this.physicsWorld.applyWindForce(this.currentDirection, this.currentWindForce);
+    
+    // 处理滚动音效
+    this.physicsWorld.playRollSound(this.currentWindForce);
+  }
+}
+
+/**
+ * 游戏主类 - 管理整个应用
+ */
+class PhysicsGame {
+  constructor() {
+    // 创建canvas元素
+    this.canvas = document.querySelector(".webgl");
+    
+    // 场景配置
+    this.config = {
+      sphereRadius: 0.3,
+      sphereHeight: 5,
+      planeWidth: 10,
+      planeHeight: 10,
+      planeQuaternion: -Math.PI / 2,
+      wallsConfig: [
+        // 左墙
+        {
+          position: [-5, 1, 0],
+          rotation: [0, -Math.PI / 2 * 3, 0],
+        },
+        // 右墙
+        {
+          position: [5, 1, 0],
+          rotation: [0, -Math.PI / 2, 0],
+        },
+        // 前墙
+        {
+          position: [0, 1, 5],
+          rotation: [-Math.PI / 2 * 2, 0, 0],
+        },
+        // 后墙
+        {
+          position: [0, 1, -5],
+          rotation: [0, 0, 0],
+        },
+      ]
+    };
+    
+    // 初始化组件
+    this.ui = new UI();
+    this.physicsWorld = new PhysicsWorld(this.config);
+    this.scene = new Scene(this.canvas, this.config, this.physicsWorld);
+    this.windSystem = new WindSystem(this.physicsWorld, this.ui);
+    
+    // 游戏状态
+    this.isInitialized = false;
+    this.clock = new THREE.Clock();
+    this.oldElapsedTime = 0;
+    
+    // 配置事件处理
+    this.physicsWorld.onBallLanded = () => this.onBallLanded();
+    
+    // 创建开始按钮
+    this.ui.createStartButton(() => this.startGame());
+  }
+  
+  onBallLanded() {
+    this.windSystem.activate();
+  }
+  
+  startGame() {
+    if (!this.isInitialized) {
+      this.animate();
+      this.isInitialized = true;
+    }
+  }
+  
+  animate() {
+    const elapsedTime = this.clock.getElapsedTime();
+    const deltaTime = elapsedTime - this.oldElapsedTime;
+    this.oldElapsedTime = elapsedTime;
+
+    // 更新物理世界
+    this.physicsWorld.update(deltaTime);
+    
+    // 处理风力变化
+    this.windSystem.update();
+    
+    // 更新视觉场景
+    this.scene.update();
+
+    // 请求下一帧
+    window.requestAnimationFrame(() => this.animate());
+  }
+}
+
+// 在DOM加载完成后启动游戏
+window.addEventListener("DOMContentLoaded", () => {
+  new PhysicsGame();
+});
