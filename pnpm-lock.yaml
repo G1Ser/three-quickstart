@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      cannon:
+        specifier: ^0.6.2
+        version: 0.6.2
       dat.gui:
         specifier: ^0.7.9
         version: 0.7.9
@@ -282,6 +285,9 @@ packages:
   '@types/estree@1.0.6':
     resolution: {integrity: sha512-AYnb1nQyY49te+VRAVgmzfcgjYS91mY5P0TKUDCLEM+gNnA+3T6rWITXRLYCpahpqSQbN5cE+gHpnPyXjHWxcw==}
 
+  cannon@0.6.2:
+    resolution: {integrity: sha512-n/7wWSXr8KOSvjad2x0fJHgpMepKjOKi+NdSnjfYyijoDBZnp4JQKgPcpv28jlXoWM+N9zVYU09J0A6Qxx+Y7w==}
+
   dat.gui@0.7.9:
     resolution: {integrity: sha512-sCNc1OHobc+Erc1HqiswYgHdVNpSJUlk/Hz8vzOCsER7rl+oF/4+v8GXFUyCgtXpoCX6+bnmg07DedLvBLwYKQ==}
 
@@ -497,6 +503,8 @@ snapshots:
     optional: true
 
   '@types/estree@1.0.6': {}
+
+  cannon@0.6.2: {}
 
   dat.gui@0.7.9: {}
 
