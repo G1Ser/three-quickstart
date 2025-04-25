@@ -98,3 +98,8 @@ const material = new THREE.MeshBasicMaterial({
 ### SpriteMaterial 2.5D 场景
 
 ### ShadowMaterial 模拟真实光影
+
+# shader
+- [learnopengl](https://learnopengl.com/Introduction)
+- [The Book of Shaders](https://thebookofshaders.com/)
+- [Shader Toy](https://www.shadertoy.com/)
