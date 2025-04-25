@@ -24,6 +24,10 @@ class Scene {
       this.scene.remove(objects);
     }
   }
+
+  setEnvironmentMap(environmentMap) {
+    this.scene.background = environmentMap;
+  }
 }
 
 export default Scene;

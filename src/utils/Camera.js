@@ -22,6 +22,7 @@ class Camera {
     this.camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 
     this.camera.position.set(position.x, position.y, position.z);
+    this.camera.lookAt(0, 0, 0);
 
     this.handleResize();
   }
