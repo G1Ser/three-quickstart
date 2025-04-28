@@ -9,25 +9,28 @@ const scene = new THREE.Scene();
 const gltfLoader = new GLTFLoader();
 
 //light
-// const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-directionalLight.position.set(1, 1, 0);
+directionalLight.castShadow = true;
+directionalLight.position.set(2, 2, 0);
+directionalLight.shadow.mapSize.width = 1024;
+directionalLight.shadow.mapSize.height = 1024;
 scene.add(directionalLight);
 
 const debugObject = {
-  envMapIntensity: 1.0,
+  envMapIntensity: 2.0,
   foxPosition: {
     x: 0,
-    y: -1,
+    y: -0.5,
     z: 0,
   },
   foxRotation: {
     x: 0,
-    y: (-Math.PI * 1) / 3,
+    y: -0.8,
     z: 0,
   },
   foxScale: 0.015,
 };
+let foxFolder;
 
 //gui
 if (import.meta.env.DEV) {
@@ -35,15 +38,19 @@ if (import.meta.env.DEV) {
   gui
     .add(debugObject, "envMapIntensity")
     .min(0)
-    .max(3)
+    .max(5)
     .step(0.001)
+    .name("环境光强度")
     .onChange(() => {
       updateAllMaterials();
     });
-  gui.add(directionalLight, "intensity").min(0).max(3).step(0.001);
+  gui.add(directionalLight.position, "x").min(-10).max(10).step(0.001).name("光源位置X");
+  gui.add(directionalLight.position, "y").min(-10).max(10).step(0.001).name("光源位置Y");
+  gui.add(directionalLight.position, "z").min(-10).max(10).step(0.001).name("光源位置Z");
+  gui.add(directionalLight, "intensity").min(0).max(3).step(0.001).name("光源强度");
 
   // 狐狸控制组
-  const foxFolder = gui.addFolder("狐狸控制");
+  foxFolder = gui.addFolder("狐狸控制");
 
   // 位置控制
   foxFolder
@@ -52,12 +59,6 @@ if (import.meta.env.DEV) {
     .max(3)
     .step(0.001)
     .name("X位置");
-  foxFolder
-    .add(debugObject.foxPosition, "y")
-    .min(-3)
-    .max(3)
-    .step(0.001)
-    .name("Y位置");
   foxFolder
     .add(debugObject.foxPosition, "z")
     .min(-3)
@@ -96,15 +97,58 @@ const environmentMap = cubeTextureLoader.load([
 ]);
 scene.background = environmentMap;
 
+//plane
+const textureLoader = new THREE.TextureLoader();
+const planeBasicColor = textureLoader.load(
+  "src/assets/texture/plane/color.jpg"
+);
+const planeBasicNormal = textureLoader.load(
+  "src/assets/texture/plane/normal.jpg"
+);
+planeBasicColor.wrapS = THREE.RepeatWrapping;
+planeBasicNormal.wrapS = THREE.RepeatWrapping;
+planeBasicColor.wrapT = THREE.RepeatWrapping;
+planeBasicNormal.wrapT = THREE.RepeatWrapping;
+planeBasicColor.repeat.set(5, 5);
+planeBasicNormal.repeat.set(5, 5);
+const planeGeometry = new THREE.CircleGeometry(5, 64);
+const planeMaterial = new THREE.MeshStandardMaterial({
+  map: planeBasicColor,
+  normalMap: planeBasicNormal,
+});
+const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+plane.position.y = debugObject.foxPosition.y;
+plane.rotation.x = -Math.PI * 0.5;
+plane.receiveShadow = true;
+scene.add(plane);
 //model
 let foxModel;
+let foxAnimation;
+let foxMixer;
+let foxActions = {};
+let activeAction;
 gltfLoader.load("src/assets/model/Fox.glb", (gltf) => {
   foxModel = gltf.scene;
+  foxAnimation = gltf.animations;
+  foxMixer = new THREE.AnimationMixer(foxModel);
+  // 创建每个动画的 action
+  foxAnimation.forEach((clip) => {
+    foxActions[foxAnimationNameMap[clip.name]] = foxMixer.clipAction(clip);
+  });
   updateFoxScale();
   updateFoxPosition();
   updateFoxRotation();
   scene.add(foxModel);
+  foxModel.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.castShadow = true;
+    }
+  });
   updateAllMaterials();
+  // 动画按钮动态添加
+  if (import.meta.env.DEV) {
+    addAnimationControls(foxFolder, foxAnimation, foxActions);
+  }
 });
 const updateFoxPosition = () => {
   foxModel.position.set(
@@ -140,12 +184,22 @@ const canvas = document.querySelector(".webgl");
 //controls
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
+controls.minDistance = 3;
+controls.maxDistance = 5;
+controls.minPolarAngle = Math.PI * 0.5;
+controls.maxPolarAngle = Math.PI * 0.5;
+// 设置水平旋转角度限制
+controls.minAzimuthAngle = -Math.PI * 0.5;
+controls.maxAzimuthAngle = Math.PI * 0.5;
 //renderer
 const renderer = new THREE.WebGLRenderer({
   canvas,
   antialias: true,
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const updateAllMaterials = () => {
   scene.traverse((child) => {
     if (
@@ -157,8 +211,10 @@ const updateAllMaterials = () => {
     }
   });
 };
-updateAllMaterials();
+const clock = new THREE.Clock();
 const tick = () => {
+  const delta = clock.getDelta();
+  if (foxMixer) foxMixer.update(delta);
   controls.update();
   renderer.render(scene, camera);
   if (foxModel) {
@@ -174,3 +230,31 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
 });
 tick();
+const foxAnimationNameMap = {
+  Survey: "观察",
+  Walk: "行走",
+  Run: "奔跑",
+};
+// 动画控制按钮动态添加函数
+function addAnimationControls(foxFolder, foxAnimation, foxActions) {
+  // 动画名数组，首位加"无动画"
+  const animationNames = ["无动画", ...foxAnimation.map((clip) => foxAnimationNameMap[clip.name])];
+  // 当前动画名
+  let currentAnimationName = animationNames[0];
+  // dat.GUI 绑定对象
+  const animObj = { 当前动画: currentAnimationName };
+
+  foxFolder
+    .add(animObj, "当前动画", animationNames)
+    .name("动画选择")
+    .onChange((name) => {
+      if (activeAction) activeAction.stop();
+      if (name === "无动画") {
+        activeAction = null;
+        return;
+      }
+      activeAction = foxActions[name];
+      activeAction.reset().play();
+      currentAnimationName = name;
+    });
+}
