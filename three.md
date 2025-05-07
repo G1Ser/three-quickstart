@@ -45,6 +45,7 @@ A simple but complete example: [example](https://jsfiddle.net/ikatyang/182ztwao/
 ### 10.[GrabCAD](https://grabcad.com/library)
 
 ### 11.[GLTF](https://github.com/KhronosGroup/glTF-Sample-Models)
+
 # Material 材质
 
 ### 1.LineBasicMaterial 用于绘制几何体框线
@@ -98,3 +99,9 @@ const material = new THREE.MeshBasicMaterial({
 ### SpriteMaterial 2.5D 场景
 
 ### ShadowMaterial 模拟真实光影
+
+# Shader 着色器
+
+### 1.[The Book of Shaders](https://thebookofshaders.com/)
+
+### 2.[ShaderToy](https://www.shadertoy.com/)

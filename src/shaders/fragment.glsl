@@ -1,9 +1,11 @@
 precision mediump float;
+uniform sampler2D uTexture;
 
-// 接收顶点着色器传递过来的随机值
-varying float vRandom;
+// 接收顶点着色器传递过来的uv
+varying vec2 vUv;
 
 void main()
 {
-  gl_FragColor = vec4(1.0, vRandom, 0.0, 1.0);
+  vec4 textureColor = texture2D(uTexture, vUv);
+  gl_FragColor = textureColor;
 } 
